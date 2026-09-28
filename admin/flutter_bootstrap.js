@@ -31,25 +31,54 @@ addEventListener("message", eventListener);
 //# sourceMappingURL=flutter.js.map
 
 // v1.0.44: sanitize navigator.languages so Dart's Locale constructor
-// doesn't throw RangeError("Incorrect locale information provided")
-// on the browser's first visit. Some Chromium variants report locale
-// tags (e.g. empty `language-`, or a private-use 4-char script) that
-// `new Intl.Locale(...)` accepts but Dart's `Locale(...)` rejects,
-// which previously made the entire app crash with a white screen.
-// We whitelist only BCP-47 short tags that Dart's Locale accepts.
+// doesn't throw RangeError("Incorrect locale information provided").
+// Some Chromium variants report locale tags (empty 'language-',
+// private-use 4-char scripts, etc.) that `new Intl.Locale(...)`
+// accepts but Dart's `Locale(...)` rejects, crashing the whole app.
+// We monkey-patch Intl.Locale so any tag Dart would reject falls back
+// to a safe short tag. Then we also reduce navigator.languages to
+// only Dart-safe values.
 (function () {
   try {
+    var SAFE = ['en', 'en-US', 'ar', 'ar-EG'];
+    // 1) Patch Intl.Locale to never expose non-Dart-safe fields.
+    if (typeof Intl !== 'undefined' && Intl.Locale) {
+      var OrigLocale = Intl.Locale;
+      function PatchedLocale(tag, opts) {
+        try { return new OrigLocale(tag, opts); }
+        catch (e) { return new OrigLocale('en'); }
+      }
+      PatchedLocale.prototype = OrigLocale.prototype;
+      try { Intl.Locale = PatchedLocale; } catch (_) {}
+    }
+    // 2) Reduce navigator.languages to Dart-safe values only.
+    function isDartSafe(tag) {
+      if (typeof tag !== 'string') return false;
+      if (!/^[a-z]{2,3}(-[A-Z]{2,3})?$/.test(tag)) return false;
+      return true;
+    }
     var orig = navigator.languages;
-    if (!orig || !Array.isArray(orig)) return;
-    var filtered = orig.filter(function (l) {
-      if (typeof l !== 'string' || l.length < 2) return false;
-      return /^[a-z]{2,3}(-[A-Z]{2,3})?$/.test(l);
-    });
-    if (filtered.length === 0) filtered.push('en');
-    Object.defineProperty(navigator, 'languages', {
-      get: function () { return filtered; },
-      configurable: true,
-    });
+    var filtered = (orig && orig.length) ? Array.prototype.filter.call(orig, isDartSafe) : [];
+    if (filtered.length === 0) filtered = ['en'];
+    var fixed = filtered.slice();
+    try {
+      Object.defineProperty(navigator, 'languages', {
+        get: function () { return fixed; },
+        configurable: true,
+      });
+    } catch (_) {}
+    // 3) Last-resort: override the read-only languages property
+    //    by replacing the whole navigator object descriptor.
+    try {
+      var desc = Object.getOwnPropertyDescriptor(Navigator.prototype, 'languages');
+      if (desc && !desc.configurable) {
+        Object.defineProperty(Navigator.prototype, 'languages', {
+          get: function () { return fixed; },
+          configurable: true,
+          enumerable: desc.enumerable,
+        });
+      }
+    } catch (_) {}
   } catch (_) {}
 })();
 
