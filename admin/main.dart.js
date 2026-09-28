@@ -1043,8 +1043,8 @@ aGm(){var s,r,q,p,o=v.G,n=o.window,m=A.aWg(n.navigator)
 if(m==null||m.length===0)return B.MY
 s=A.b([],t.ss)
 for(n=m.length,r=0;r<m.length;m.length===n||(0,A.E)(m),++r){q=m[r]
-p=new o.Intl.Locale(q)
-s.push(new A.kA(p.language,p.script,p.region))}return s},
+try{p=new o.Intl.Locale(q);s.push(new A.kA(p.language,p.script,p.region))}catch(_){s.push(new A.kA('en'))}
+}return s},
 b2Q(a,b){var s=a.jJ(b),r=A.b4F(A.bd(s.b))
 switch(s.a){case"setDevicePixelRatio":$.dd().d=r
 $.aP().x.$0()
