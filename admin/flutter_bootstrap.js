@@ -30,58 +30,6 @@ addEventListener("message", eventListener);
 `],{type:"application/javascript"})):c(t,d),mainScriptUrlOrBlob:s})};var P=w.supportsWasmGC,G=P&&w.webGLVersion>0,b=class{async loadEntrypoint(e){let{serviceWorker:n,...t}=e||{},r=new y,a=new g;a.setTrustedTypesPolicy(r.policy),await a.loadServiceWorker(n).catch(o=>{console.warn("Exception while loading service worker:",o)});let s=new v;return s.setTrustedTypesPolicy(r.policy),this.didCreateEngineInitializer=s.didCreateEngineInitializer.bind(s),s.loadEntrypoint(t)}async load({serviceWorkerSettings:e,onEntrypointLoaded:n,nonce:t,config:r}={}){r??={};let a=_flutter.buildConfig;if(!a)throw"FlutterLoader.load requires _flutter.buildConfig to be set";let s=r.wasmAllowList?.[w.browserEngine]??_[w.browserEngine],o=m=>{switch(m){case"skwasm":return G&&s;default:return!0}},l=m=>m.compileTarget==="dart2wasm"&&!P||r.renderer&&r.renderer!=m.renderer?!1:o(m.renderer),u=a.builds.find(l);if(!u)throw"FlutterLoader could not find a build compatible with configuration and environment.";let d={};d.flutterTT=new y,e&&(d.serviceWorkerLoader=new g,d.serviceWorkerLoader.setTrustedTypesPolicy(d.flutterTT.policy),await d.serviceWorkerLoader.loadServiceWorker(e).catch(m=>{console.warn("Exception while loading service worker:",m)}));let p=E(r,a);u.renderer==="canvaskit"?d.canvasKit=U(d,r,w,p):u.renderer==="skwasm"&&(d.skwasm=W(d,r,w,p));let f=new v;return f.setTrustedTypesPolicy(d.flutterTT.policy),this.didCreateEngineInitializer=f.didCreateEngineInitializer.bind(f),f.load(u,d,r,t,n)}};window._flutter||(window._flutter={});window._flutter.loader||(window._flutter.loader=new b);})();
 //# sourceMappingURL=flutter.js.map
 
-// v1.0.44: sanitize navigator.languages so Dart's Locale constructor
-// doesn't throw RangeError("Incorrect locale information provided").
-// Some Chromium variants report locale tags (empty 'language-',
-// private-use 4-char scripts, etc.) that `new Intl.Locale(...)`
-// accepts but Dart's `Locale(...)` rejects, crashing the whole app.
-// We monkey-patch Intl.Locale so any tag Dart would reject falls back
-// to a safe short tag. Then we also reduce navigator.languages to
-// only Dart-safe values.
-(function () {
-  try {
-    var SAFE = ['en', 'en-US', 'ar', 'ar-EG'];
-    // 1) Patch Intl.Locale to never expose non-Dart-safe fields.
-    if (typeof Intl !== 'undefined' && Intl.Locale) {
-      var OrigLocale = Intl.Locale;
-      function PatchedLocale(tag, opts) {
-        try { return new OrigLocale(tag, opts); }
-        catch (e) { return new OrigLocale('en'); }
-      }
-      PatchedLocale.prototype = OrigLocale.prototype;
-      try { Intl.Locale = PatchedLocale; } catch (_) {}
-    }
-    // 2) Reduce navigator.languages to Dart-safe values only.
-    function isDartSafe(tag) {
-      if (typeof tag !== 'string') return false;
-      if (!/^[a-z]{2,3}(-[A-Z]{2,3})?$/.test(tag)) return false;
-      return true;
-    }
-    var orig = navigator.languages;
-    var filtered = (orig && orig.length) ? Array.prototype.filter.call(orig, isDartSafe) : [];
-    if (filtered.length === 0) filtered = ['en'];
-    var fixed = filtered.slice();
-    try {
-      Object.defineProperty(navigator, 'languages', {
-        get: function () { return fixed; },
-        configurable: true,
-      });
-    } catch (_) {}
-    // 3) Last-resort: override the read-only languages property
-    //    by replacing the whole navigator object descriptor.
-    try {
-      var desc = Object.getOwnPropertyDescriptor(Navigator.prototype, 'languages');
-      if (desc && !desc.configurable) {
-        Object.defineProperty(Navigator.prototype, 'languages', {
-          get: function () { return fixed; },
-          configurable: true,
-          enumerable: desc.enumerable,
-        });
-      }
-    } catch (_) {}
-  } catch (_) {}
-})();
-
 if (!window._flutter) {
   window._flutter = {};
 }
